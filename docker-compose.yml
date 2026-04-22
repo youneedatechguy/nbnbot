@@ -13,9 +13,6 @@ services:
       - analytics:/mnt/apps/yambabroadband/analytics
       - bot-logs:/var/log/yambabroadband
 
-    # Load environment from .env file (should be in same directory as docker-compose.yml)
-    # Or set vars directly in Portainer's Stack environment panel
-    env_file: .env
 
     # Resource limits
     mem_limit: 256m
