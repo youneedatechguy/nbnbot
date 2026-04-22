@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  nbn-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yambabroadband-nbn-bot
+    restart: unless-stopped
+
+    # Persist analytics and bot logs
+    volumes:
+      - analytics:/mnt/apps/yambabroadband/analytics
+      - bot-logs:/var/log/yambabroadband
+
+    # Load environment from .env file (should be in same directory as docker-compose.yml)
+    # Or set vars directly in Portainer's Stack environment panel
+    env_file: .env
+
+    # Resource limits
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpus: '0.5'
+
+    # Logging - captures stdout/stderr, rotates automatically
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Keep container responsive to signals
+    stdin_open: false
+    tty: false
+
+volumes:
+  analytics:
+    driver: local
+  bot-logs:
+    driver: local
