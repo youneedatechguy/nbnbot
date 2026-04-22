@@ -6,9 +6,6 @@ import sys
 from pathlib import Path
 
 from .handlers import build_application
-import sys
-sys.path.insert(0, "/mnt/apps/yambabroadband/analytics")
-from tracking import track_bot_started
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
