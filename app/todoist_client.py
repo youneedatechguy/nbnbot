@@ -187,6 +187,13 @@ class TodoistClient:
         await self._request("DELETE", f"/tasks/{task_id}", None)
         return True
     
+    async def move_task(self, task_id: str, project_id: str) -> TodoistTask | None:
+        json = {"project_id": project_id}
+        result = await self._request("PATCH", f"/tasks/{task_id}", json)
+        if result:
+            return TodoistTask(**result)
+        return None
+    
     async def get_projects(self) -> list[TodoistProject]:
         result = await self._request("GET", "/projects", None)
         if isinstance(result, list):

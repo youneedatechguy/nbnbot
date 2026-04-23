@@ -3,8 +3,12 @@ import logging
 from pydantic import BaseModel
 from openai import AsyncOpenAI
 from .todoist_client import TodoistClient, TodoistTask
+from .config import settings
 
 logger = logging.getLogger(__name__)
+
+
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 class Intent(BaseModel):
@@ -20,12 +24,14 @@ Supported actions:
 - create_task: Create a new task (requires: content)
 - list_tasks: List existing tasks (optional: project)
 - complete_task: Mark a task as complete (requires: task_name)
+- move_task: Move task to different project (requires: task_name, project)
 - help: Show help message
 
 Respond with JSON only:
 {"action": "create_task", "content": "...", "project": "..."}
 {"action": "list_tasks", "project": "..."}
 {"action": "complete_task", "task_name": "..."}
+{"action": "move_task", "task_name": "...", "project": "..."}
 {"action": "help"}
 """
 
@@ -35,12 +41,29 @@ class TodoistAgent:
         self,
         todoist_client: TodoistClient,
         openai_api_key: str | None = None,
+        openrouter_api_key: str | None = None,
+        model_provider: str = "openai",
         model_name: str = "gpt-4o-mini",
     ):
         self.todoist_client = todoist_client
-        self.openai_api_key = openai_api_key
-        self.model_name = model_name
-        self.client = AsyncOpenAI(api_key=openai_api_key) if openai_api_key else None
+        self.openai_api_key = openai_api_key or settings.openai_api_key
+        self.openrouter_api_key = openrouter_api_key or settings.openrouter_api_key
+        self.model_provider = model_provider or settings.model_provider
+        self.model_name = model_name or settings.model_name
+        self.client = self._create_client()
+    
+    def _create_client(self):
+        if self.model_provider == "openrouter":
+            if not self.openrouter_api_key:
+                return None
+            return AsyncOpenAI(
+                api_key=self.openrouter_api_key,
+                base_url=OPENROUTER_BASE_URL,
+            )
+        else:
+            if not self.openai_api_key:
+                return None
+            return AsyncOpenAI(api_key=self.openai_api_key)
     
     async def process_message(self, message: str, from_number: str) -> str:
         if not self.client:
@@ -57,8 +80,12 @@ class TodoistAgent:
         if not self.client:
             return self._simple_classify(message)
         
+        model = self.model_name
+        if self.model_provider == "openrouter":
+            model = f"openai/{self.model_name}"
+        
         response = await self.client.chat.completions.create(
-            model=self.model_name,
+            model=model,
             messages=[
                 {"role": "system", "content": IntentClassifier.SYSTEM_PROMPT},
                 {"role": "user", "content": message},
@@ -117,6 +144,22 @@ class TodoistAgent:
                 if task_name.lower() in task.content.lower():
                     await self.todoist_client.complete_task(task.id)
                     return f"✓ Completed: {task.content}"
+            
+            return f"Task not found: {task_name}"
+        
+        if action == "move_task":
+            task_name = intent.get("task_name", original_message)
+            project = intent.get("project")
+            
+            if not project:
+                return "Please specify a project to move the task to."
+            
+            tasks = await self.todoist_client.get_tasks()
+            
+            for task in tasks:
+                if task_name.lower() in task.content.lower():
+                    await self.todoist_client.move_task(task.id, project)
+                    return f"➡️ Moved '{task.content}' to project {project}"
             
             return f"Task not found: {task_name}"
         
