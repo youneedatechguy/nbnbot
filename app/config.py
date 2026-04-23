@@ -4,6 +4,7 @@ from pydantic import BaseModel
 class Settings(BaseModel):
     todoist_api_token: str | None = None
     openai_api_key: str | None = None
+    openrouter_api_key: str | None = None
     
     twilio_account_sid: str | None = None
     twilio_auth_token: str | None = None
@@ -21,6 +22,7 @@ def load_settings() -> Settings:
     return Settings(
         todoist_api_token=getenv("TODOIST_API_TOKEN"),
         openai_api_key=getenv("OPENAI_API_KEY"),
+        openrouter_api_key=getenv("OPENROUTER_API_KEY"),
         twilio_account_sid=getenv("TWILIO_ACCOUNT_SID"),
         twilio_auth_token=getenv("TWILIO_AUTH_TOKEN"),
         twilio_whatsapp_number=getenv("TWILIO_WHATSAPP_NUMBER"),
