@@ -13,11 +13,18 @@ services:
     # Environment variables from Portainer
     # Required API credentials:
     # - TODOIST_API_TOKEN from todoist.com/prefs/integrations
+    # - TWILIO_ACCOUNT_SID from console.twilio.com
+    # - TWILIO_AUTH_TOKEN from console.twilio.com  
+    # - TWILIO_WHATSAPP_NUMBER (WhatsApp sandbox number)
     # - OPENAI_API_KEY from platform.openai.com/api-keys
-    # - WHATSAPP_SESSION_PATH (optional, defaults to ./auth)
     environment:
       # Todoist API
       - TODOIST_API_TOKEN
+
+      # Twilio WhatsApp
+      - TWILIO_ACCOUNT_SID
+      - TWILIO_AUTH_TOKEN
+      - TWILIO_WHATSAPP_NUMBER
 
       # AI Models
       - OPENAI_API_KEY
@@ -25,28 +32,21 @@ services:
       - MODEL_PROVIDER
       - MODEL_NAME
 
-      # WhatsApp Session
-      - WHATSAPP_SESSION_PATH=/app/auth
-
-      # Redis (optional - for conversation context)
-      - REDIS_URL
-
       # Legacy NBN bot credentials (if needed)
       - TELEGRAM_BOT_TOKEN
       - IPERIUM_EMAIL
       - IPERIUM_PASSWORD
       - GOOGLE_MAPS_API_KEY
 
-    # Persist WhatsApp auth session and analytics
+    # Persist analytics and bot logs
     volumes:
-      - whatsapp-auth:/app/auth
       - analytics:/mnt/apps/yambabroadband/analytics
       - bot-logs:/var/log/yambabroadband
 
 
     # Resource limits
-    mem_limit: 512m
-    memswap_limit: 512m
+    mem_limit: 256m
+    memswap_limit: 256m
     cpus: '0.5'
 
     # Logging - captures stdout/stderr, rotates automatically
@@ -56,13 +56,11 @@ services:
         max-size: "10m"
         max-file: "3"
 
-    # Keep container running with WhatsApp connection
-    stdin_open: true
-    tty: true
+    # Keep container responsive to signals
+    stdin_open: false
+    tty: false
 
 volumes:
-  whatsapp-auth:
-    driver: local
   analytics:
     driver: local
   bot-logs:
