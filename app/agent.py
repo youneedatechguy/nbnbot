@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from openai import AsyncOpenAI
 from .todoist_client import TodoistClient, TodoistTask
 from .config import settings
+from .redis_conversation import RedisConversationStore
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ Supported actions:
 - list_tasks: List existing tasks (optional: project)
 - complete_task: Mark a task as complete (requires: task_name)
 - move_task: Move task to different project (requires: task_name, project)
+- update_task: Update task properties (requires: task_name, optional: priority, labels, due)
 - help: Show help message
 
 Respond with JSON only:
@@ -32,6 +34,7 @@ Respond with JSON only:
 {"action": "list_tasks", "project": "..."}
 {"action": "complete_task", "task_name": "..."}
 {"action": "move_task", "task_name": "...", "project": "..."}
+{"action": "update_task", "task_name": "...", "priority": 1-4, "labels": [...], "due": "..."}
 {"action": "help"}
 """
 
@@ -44,12 +47,16 @@ class TodoistAgent:
         openrouter_api_key: str | None = None,
         model_provider: str = "openai",
         model_name: str = "gpt-4o-mini",
+        redis_url: str | None = None,
     ):
         self.todoist_client = todoist_client
         self.openai_api_key = openai_api_key or settings.openai_api_key
         self.openrouter_api_key = openrouter_api_key or settings.openrouter_api_key
         self.model_provider = model_provider or settings.model_provider
         self.model_name = model_name or settings.model_name
+        self.conversation_store = RedisConversationStore(
+            redis_url or settings.redis_url
+        )
         self.client = self._create_client()
     
     def _create_client(self):
@@ -66,17 +73,25 @@ class TodoistAgent:
             return AsyncOpenAI(api_key=self.openai_api_key)
     
     async def process_message(self, message: str, from_number: str) -> str:
+        if self.conversation_store.is_connected:
+            self.conversation_store.add_message(from_number, "user", message)
+        
         if not self.client:
             return self._fallback_process(message)
         
         try:
-            intent = await self._classify_intent(message)
-            return await self._execute_intent(intent, message)
+            intent = await self._classify_intent(message, from_number)
+            response = await self._execute_intent(intent, message, from_number)
+            
+            if self.conversation_store.is_connected:
+                self.conversation_store.add_message(from_number, "assistant", response)
+            
+            return response
         except Exception as e:
             logger.exception(f"Error processing message: {e}")
             return self._fallback_process(message)
     
-    async def _classify_intent(self, message: str) -> dict:
+    async def _classify_intent(self, message: str, from_number: str) -> dict:
         if not self.client:
             return self._simple_classify(message)
         
@@ -84,22 +99,46 @@ class TodoistAgent:
         if self.model_provider == "openrouter":
             model = f"openai/{self.model_name}"
         
+        conversation_context = await self._get_conversation_context(from_number)
+        
+        messages = [{"role": "system", "content": IntentClassifier.SYSTEM_PROMPT}]
+        
+        if conversation_context:
+            messages.append({"role": "system", "content": f"Previous conversation:\n{conversation_context}"})
+        
+        messages.append({"role": "user", "content": message})
+        
         response = await self.client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": IntentClassifier.SYSTEM_PROMPT},
-                {"role": "user", "content": message},
-            ],
+            messages=messages,
             response_format={"type": "json_object"},
         )
         
         return json.loads(response.choices[0].message.content)
+    
+    async def _get_conversation_context(self, from_number: str) -> str | None:
+        if not self.conversation_store.is_connected:
+            return None
+        
+        context = self.conversation_store.get_context(from_number)
+        if not context or not context.message_history:
+            return None
+        
+        recent_messages = context.message_history[-6:]
+        lines = []
+        for msg in recent_messages:
+            role = "User" if msg["role"] == "user" else "Assistant"
+            lines.append(f"{role}: {msg['content']}")
+        
+        return "\n".join(lines)
     
     def _simple_classify(self, message: str) -> dict:
         text = message.lower()
         
         if "complete" in text or "done" in text or "finished" in text:
             return {"action": "complete_task", "task_name": message}
+        if "move" in text or "transfer" in text or "shift to" in text:
+            return {"action": "move_task", "task_name": message}
         if "list" in text or "show" in text or "my tasks" in text:
             return {"action": "list_tasks"}
         if "create" in text or "add" in text or "new task" in text:
@@ -107,7 +146,7 @@ class TodoistAgent:
         
         return {"action": "help"}
     
-    async def _execute_intent(self, intent: dict, original_message: str) -> str:
+    async def _execute_intent(self, intent: dict, original_message: str, from_number: str) -> str:
         action = intent.get("action", "help")
         
         if action == "create_task":
@@ -120,6 +159,10 @@ class TodoistAgent:
                 project_id=project,
                 due_string=due,
             )
+            
+            if self.conversation_store.is_connected:
+                self.conversation_store.add_recent_task(from_number, task.id)
+            
             return f"✅ Task created: {task.content}\nID: {task.id}"
         
         if action == "list_tasks":
@@ -159,11 +202,41 @@ class TodoistAgent:
             for task in tasks:
                 if task_name.lower() in task.content.lower():
                     await self.todoist_client.move_task(task.id, project)
+                    
+                    if self.conversation_store.is_connected:
+                        self.conversation_store.set_current_project(from_number, project)
+                    
                     return f"➡️ Moved '{task.content}' to project {project}"
             
             return f"Task not found: {task_name}"
         
+        if action == "update_task":
+            return await self._execute_update_task(intent, original_message, from_number)
+        
         return self._help_message()
+    
+    async def _execute_update_task(self, intent: dict, original_message: str, from_number: str) -> str:
+        task_name = intent.get("task_name", original_message)
+        
+        priority = intent.get("priority")
+        labels = intent.get("labels")
+        due_string = intent.get("due")
+        content = intent.get("content")
+        
+        tasks = await self.todoist_client.get_tasks()
+        
+        for task in tasks:
+            if task_name.lower() in task.content.lower():
+                await self.todoist_client.update_task(
+                    task.id,
+                    content=content,
+                    priority=priority,
+                    labels=labels,
+                    due_string=due_string,
+                )
+                return f"🔄 Updated: {task.content}"
+        
+        return f"Task not found: {task_name}"
     
     def _fallback_process(self, message: str) -> str:
         intent = self._simple_classify(message)
@@ -174,5 +247,8 @@ class TodoistAgent:
             "📝 *Commands:*\n"
             "• Create task: \"Create a task to...\"\n"
             "• List tasks: \"Show my tasks\"\n"
-            "• Complete task: \"Complete [task name]\""
+            "• Complete task: \"Complete [task name]\"\n"
+            "• Move task: \"Move [task] to [project]\"\n"
+            "• Update task: \"Update [task] priority/date\"\n"
+            "• Help: \"Help\""
         )

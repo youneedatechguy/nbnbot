@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import httpx
 import logging
 import re
@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class TodoistTask(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     id: str
     content: str
     description: str = ""
@@ -161,6 +162,9 @@ class TodoistClient:
         content: str | None = None,
         description: str | None = None,
         is_completed: bool | None = None,
+        priority: int | None = None,
+        labels: list[str] | None = None,
+        due_string: str | None = None,
     ) -> TodoistTask | None:
         json = {}
         if content is not None:
@@ -169,6 +173,12 @@ class TodoistClient:
             json["description"] = description
         if is_completed is not None:
             json["is_completed"] = is_completed
+        if priority is not None:
+            json["priority"] = priority
+        if labels is not None:
+            json["labels"] = labels
+        if due_string is not None:
+            json["due_string"] = due_string
         
         result = await self._request("PATCH", f"/tasks/{task_id}", json)
         if result:

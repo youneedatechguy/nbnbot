@@ -1,7 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class Settings(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     todoist_api_token: str | None = None
     openai_api_key: str | None = None
     openrouter_api_key: str | None = None
