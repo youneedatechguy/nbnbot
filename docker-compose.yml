@@ -1,5 +1,30 @@
 version: '3.8'
 
+# WhatsApp-Todoist Bot Docker Compose
+# ====================================
+# Required environment variables (set in Portainer or .env):
+#
+# 1. TODOIST_API_TOKEN (required for Todoist API)
+#    Get from: https://todoist.com/prefs/integrations
+#
+# 2. TWILIO_ACCOUNT_SID (required for WhatsApp)
+#    Get from: https://console.twilio.com
+#
+# 3. TWILIO_AUTH_TOKEN (required for WhatsApp)
+#    Get from: https://console.twilio.com
+#
+# 4. TWILIO_WHATSAPP_NUMBER (WhatsApp sender number)
+#    Format: whatsapp:+14155238886 (Twilio sandbox)
+#
+# 5. OPENAI_API_KEY (required for LLM intent extraction)
+#    Get from: https://platform.openai.com/api-keys
+#
+# Optional:
+# - OPENROUTER_API_KEY (fallback LLM provider)
+# - MODEL_PROVIDER=openai (or "openrouter")
+# - MODEL_NAME=gpt-4o-mini
+# - REDIS_URL=redis://localhost:6379 (for conversation history)
+
 services:
   whatsapp-todoist-bot:
     build:
@@ -9,14 +34,6 @@ services:
     restart: unless-stopped
     ports:
       - "8001:8000"
-
-    # Environment variables from Portainer
-    # Required API credentials:
-    # - TODOIST_API_TOKEN from todoist.com/prefs/integrations
-    # - TWILIO_ACCOUNT_SID from console.twilio.com
-    # - TWILIO_AUTH_TOKEN from console.twilio.com  
-    # - TWILIO_WHATSAPP_NUMBER (WhatsApp sandbox number)
-    # - OPENAI_API_KEY from platform.openai.com/api-keys
     environment:
       # Todoist API
       - TODOIST_API_TOKEN
@@ -37,6 +54,9 @@ services:
       - IPERIUM_EMAIL
       - IPERIUM_PASSWORD
       - GOOGLE_MAPS_API_KEY
+
+      # Optional: Conversation history (Redis)
+      - REDIS_URL
 
     # Persist analytics and bot logs
     volumes:
