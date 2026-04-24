@@ -1,7 +1,10 @@
-# WhatsApp-Todoist Bot Deployment Guide
+# WhatsApp-Todoist Bot Deployment Guide (Baileys)
 
 ## Overview
-Deploy the WhatsApp-Todoist integration bot to dockerhost using Docker Compose.
+
+Deploy the WhatsApp-Todoist integration bot to dockerhost using Baileys (free, self-hosted WhatsApp).
+
+**Uses Baileys (pyaileys)** - No paid Twilio account required!
 
 ## Prerequisites
 
@@ -10,16 +13,10 @@ Deploy the WhatsApp-Todoist integration bot to dockerhost using Docker Compose.
 2. Scroll to "API token" section
 3. Copy your API token
 
-### 2. Twilio WhatsApp Setup
-1. Create a [Twilio account](https://www.twilio.com/console)
-2. Get a WhatsApp-enabled phone number:
-   - Go to Messaging → Try it out → Send a WhatsApp message
-   - Follow the Twilio Sandbox setup instructions
-   - Or purchase a WhatsApp Business number
-3. Get credentials from [Twilio Console](https://console.twilio.com):
-   - **Account SID**
-   - **Auth Token**
-   - **WhatsApp Number** (format: `whatsapp:+14155238886`)
+### 2. WhatsApp Number
+- Use any WhatsApp number you own
+- No special business account needed
+- Initial QR code scan required to link the bot
 
 ### 3. OpenAI API Key
 1. Go to [OpenAI API Keys](https://platform.openai.com/api-keys)
@@ -33,13 +30,8 @@ Deploy the WhatsApp-Todoist integration bot to dockerhost using Docker Compose.
 In Portainer (or your `.env` file), set:
 
 ```bash
-# Todoist
+# Todoist API
 TODOIST_API_TOKEN=your_todoist_token_here
-
-# Twilio WhatsApp
-TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_AUTH_TOKEN=your_auth_token_here
-TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
 
 # OpenAI
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -49,6 +41,9 @@ MODEL_NAME=gpt-4o-mini
 # Optional: OpenRouter (for model fallback)
 # OPENROUTER_API_KEY=your_openrouter_key
 # MODEL_PROVIDER=openrouter
+
+# Optional: Redis (for conversation context)
+# REDIS_URL=redis://localhost:6379
 ```
 
 ### 2. Build and Deploy
@@ -57,33 +52,33 @@ MODEL_NAME=gpt-4o-mini
 cd /mnt/apps/yambabroadband/api
 
 # Build the container
-docker-compose build whatsapp-todoist-bot
+docker-compose build
 
 # Start the service
-docker-compose up -d whatsapp-todoist-bot
+docker-compose up -d
 
-# Check logs
-docker-compose logs -f whatsapp-todoist-bot
+# Check logs - you should see QR code for initial WhatsApp linking
+docker-compose logs -f
 ```
 
-### 3. Configure Twilio Webhook
+### 3. Link WhatsApp (Initial Setup)
 
-1. Go to [Twilio Console → Messaging → Settings](https://console.twilio.com/us1/develop/sms/settings/whatsapp-sender)
-2. Under "Sandbox settings" or your WhatsApp number configuration
-3. Set the webhook URL:
+1. When the container starts, check logs for the QR code:
+   ```bash
+   docker-compose logs -f
    ```
-   https://your-domain.com/webhook/whatsapp
-   ```
-   Or if using the dockerhost IP:
-   ```
-   http://YOUR_DOCKERHOST_IP:8001/webhook/whatsapp
-   ```
-4. Method: **POST**
-5. Save settings
+
+2. You will see ASCII QR code in the logs
+
+3. Open WhatsApp on your phone → Settings → Linked Devices → Link a Device
+
+4. Scan the QR code from the logs
+
+5. Session is persisted in Docker volume (`whatsapp-auth`)
 
 ### 4. Test the Bot
 
-Send a WhatsApp message to your Twilio number:
+Send a WhatsApp message to your linked number:
 
 ```
 help
@@ -110,34 +105,50 @@ docker-compose ps
 
 ### View Logs
 ```bash
-docker-compose logs -f whatsapp-todoist-bot
+docker-compose logs -f
 ```
 
 ### Restart Service
 ```bash
-docker-compose restart whatsapp-todoist-bot
+docker-compose restart
 ```
 
 ### Stop Service
 ```bash
-docker-compose stop whatsapp-todoist-bot
+docker-compose stop
 ```
 
 ### Update and Redeploy
 ```bash
 git pull
-docker-compose build whatsapp-todoist-bot
-docker-compose up -d whatsapp-todoist-bot
+docker-compose build
+docker-compose up -d
 ```
 
 ## API Endpoints
 
 The bot exposes these endpoints:
 
-- **POST /webhook/whatsapp** - Twilio WhatsApp webhook (main entry point)
-- **POST /webhook/twilio** - Alternative Twilio webhook
-- **GET /health** - Health check endpoint
+- **GET /health** - Health check (shows WhatsApp connection status)
 - **GET /tasks** - List tasks via HTTP (testing only)
+
+## Initial QR Code Linking
+
+When deploying for the first time or after session reset:
+
+1. Start the container
+2. Watch logs: `docker-compose logs -f`
+3. Find the QR code in the output
+4. Scan with WhatsApp
+
+The session will be automatically saved to the Docker volume.
+
+**To reset WhatsApp linkage:**
+```bash
+docker-compose down
+docker volume rm yambabroadband_whatsapp-auth
+docker-compose up -d
+```
 
 ## Testing Locally (Development)
 
@@ -154,59 +165,58 @@ pip install -r requirements.txt
 # Run locally
 uvicorn app.main:app --reload --port 8000
 
-# Test with curl
-curl -X POST http://localhost:8000/webhook/whatsapp \
-  -H "Content-Type: application/json" \
-  -d '{"Body": "help", "From": "whatsapp:+1234567890"}'
+# You'll see QR code in terminal for WhatsApp linking
 ```
 
 ## Troubleshooting
 
 ### Bot not responding
-1. Check logs: `docker-compose logs -f whatsapp-todoist-bot`
-2. Verify webhook URL in Twilio console
+1. Check logs: `docker-compose logs -f`
+2. Verify WhatsApp is linked (check health endpoint)
 3. Test health endpoint: `curl http://localhost:8001/health`
 4. Verify environment variables are set correctly
+
+### WhatsApp disconnected
+1. Restart the container: `docker-compose restart`
+2. Check if session volume is working: `docker volume inspect yambabroadband_whatsapp-auth`
+3. If session is corrupted, reset: `docker volume rm yambabroadband_whatsapp-auth && docker-compose up -d`
 
 ### Authentication errors
 - **Todoist**: Check `TODOIST_API_TOKEN` is valid
 - **OpenAI**: Verify `OPENAI_API_KEY` and check billing/quota
-- **Twilio**: Confirm `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`
 
-### Webhook not receiving messages
-1. Verify Twilio webhook URL is correct and publicly accessible
-2. Check firewall allows inbound traffic on port 8001
-3. Test webhook manually with curl
-4. Check Twilio debugger: https://console.twilio.com/us1/monitor/debugger
-
-### Tasks not creating in Todoist
-1. Verify `TODOIST_API_TOKEN` has write permissions
-2. Check OpenAI API is responding (model availability)
-3. Review logs for agent processing errors
+### QR Code not appearing
+1. Check if container started: `docker-compose ps`
+2. Check logs for errors: `docker-compose logs | tail -50`
 
 ## Security Considerations
 
-⚠️ **Production Hardening** (Phase 2+):
-- Add Twilio webhook signature validation
-- Use HTTPS with valid SSL certificate
-- Implement rate limiting
-- Add user authentication/allowlist
-- Monitor API usage and costs
+- WhatsApp session credentials are stored in Docker volume
+- API keys should be set via Portainer environment variables
+- Consider using Docker secrets for production
 
-## Cost Estimates
+## Cost Comparison
 
-- **Twilio Sandbox**: Free (for testing)
-- **Twilio WhatsApp Business**: ~$0.005 per message
-- **OpenAI gpt-4o-mini**: ~$0.15 per 1M input tokens, $0.60 per 1M output tokens
-- **Todoist API**: Free
+| Service | Cost |
+|---------|------|
+| Baileys (WhatsApp) | Free |
+| OpenAI gpt-4o-mini | ~$0.15/1M input, $0.60/1M output |
+| Todoist API | Free |
+| Redis (optional) | Free (self-hosted) |
 
-Estimated monthly cost for moderate usage: **$5-15/month**
+**Total: ~$5-15/month for moderate OpenAI usage**
 
-## Next Steps (Phase 2)
+## Advantages over Twilio
 
-See [YAM-39](/YAM/issues/YAM-39) for:
-- Enhanced agent with multi-model support
+1. **No paid account required** - Use your existing WhatsApp
+2. **No webhook configuration** - Direct connection to WhatsApp
+3. **Free for personal use** - No per-message costs
+4. **Simpler setup** - Just scan QR code
+
+## Next Steps (Phase 4)
+
+See [YAM-44](/YAM/issues/YAM-44) for:
+- Enhanced Todoist Client integration
 - Task update/move/complete operations
 - Project management
 - Better error handling
-- Webhook signature validation

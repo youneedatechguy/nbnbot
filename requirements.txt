@@ -4,11 +4,11 @@ pydantic==2.7.0
 pydantic-settings==2.2.1
 python-multipart==0.0.6
 
-# WhatsApp-Todoist Bot (Phase 1)
+# WhatsApp-Todoist Bot (Baileys - free self-hosted)
 fastapi==0.110.0
 uvicorn[standard]==0.29.0
 openai==1.14.0
-twilio==9.0.0
+pyaileys==0.1.4
 
 # NBN Telegram Bot (Legacy)
 googlemaps==4.10.0

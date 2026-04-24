@@ -13,6 +13,10 @@ class Settings(BaseModel):
     model_provider: str = "openai"
     model_name: str = "gpt-4o-mini"
     
+    redis_url: str | None = None
+    
+    whatsapp_session_path: str = "./auth"
+    
     mock_todoist: bool = False
 
 
@@ -28,6 +32,8 @@ def load_settings() -> Settings:
         twilio_whatsapp_number=getenv("TWILIO_WHATSAPP_NUMBER"),
         model_provider=getenv("MODEL_PROVIDER", "openai"),
         model_name=getenv("MODEL_NAME", "gpt-4o-mini"),
+        redis_url=getenv("REDIS_URL"),
+        whatsapp_session_path=getenv("WHATSAPP_SESSION_PATH", "./auth"),
         mock_todoist=getenv("MOCK_TODOIST", "false").lower() == "true",
     )
 
