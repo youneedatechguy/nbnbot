@@ -11,6 +11,12 @@ services:
       - "8001:8000"
 
     # Environment variables from Portainer
+    # Required API credentials:
+    # - TODOIST_API_TOKEN from todoist.com/prefs/integrations
+    # - TWILIO_ACCOUNT_SID from console.twilio.com
+    # - TWILIO_AUTH_TOKEN from console.twilio.com  
+    # - TWILIO_WHATSAPP_NUMBER (WhatsApp sandbox number)
+    # - OPENAI_API_KEY from platform.openai.com/api-keys
     environment:
       # Todoist API
       - TODOIST_API_TOKEN
