@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
-from .lookup_api import LookupRequest, get_lookup_service, format_lookup_message
+from app.lookup_api import LookupRequest, get_lookup_service, format_lookup_message
 from bot.nbn_service import NBNService
 
 
