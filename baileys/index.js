@@ -47,13 +47,18 @@ async function start() {
     }
 
     if (connection === "close") {
-      const shouldReconnect =
-        lastDisconnect?.error?.output?.statusCode !==
-        DisconnectReason.loggedOut;
-      if (shouldReconnect) {
-        console.log("WhatsApp connection closed; restarting container...");
+      const reason =
+        lastDisconnect?.error?.output?.statusCode ??
+        lastDisconnect?.reason;
+      const loggedOut = reason === DisconnectReason.loggedOut;
+
+      if (loggedOut) {
+        console.log("WhatsApp logged out. Stopping.");
         process.exit(0);
       }
+
+      console.log("WhatsApp connection closed; restarting container...");
+      process.exit(1);
     }
   });
 
@@ -106,7 +111,13 @@ async function start() {
 }
 
 if (require.main === module) {
-  start();
+  start().catch((err) => {
+    console.error(
+      "Fatal: failed to start WhatsApp socket:",
+      err?.message || err
+    );
+    process.exit(1);
+  });
 }
 
 module.exports = { start };
