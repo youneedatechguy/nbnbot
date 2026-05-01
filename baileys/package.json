@@ -1,0 +1,12 @@
+{
+  "name": "whatsapp-nbn-baileys",
+  "private": true,
+  "type": "commonjs",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.0",
+    "axios": "^1.6.8",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

@@ -1,87 +1,53 @@
 version: '3.8'
 
-# WhatsApp-Todoist Bot Docker Compose
-# ====================================
-# Required environment variables (set in Portainer or .env):
-#
-# 1. TODOIST_API_TOKEN (required for Todoist API)
-#    Get from: https://todoist.com/prefs/integrations
-#
-# 2. TWILIO_ACCOUNT_SID (required for WhatsApp)
-#    Get from: https://console.twilio.com
-#
-# 3. TWILIO_AUTH_TOKEN (required for WhatsApp)
-#    Get from: https://console.twilio.com
-#
-# 4. TWILIO_WHATSAPP_NUMBER (WhatsApp sender number)
-#    Format: whatsapp:+14155238886 (Twilio sandbox)
-#
-# 5. OPENAI_API_KEY (required for LLM intent extraction)
-#    Get from: https://platform.openai.com/api-keys
-#
-# Optional:
-# - OPENROUTER_API_KEY (fallback LLM provider)
-# - MODEL_PROVIDER=openai (or "openrouter")
-# - MODEL_NAME=gpt-4o-mini
-# - REDIS_URL=redis://localhost:6379 (for conversation history)
-
 services:
-  whatsapp-todoist-bot:
+  whatsapp-nbn-lookup-bot:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: yambabroadband-whatsapp-todoist
+    container_name: whatsapp-nbn-lookup-bot
     restart: unless-stopped
     ports:
       - "8001:8000"
     environment:
-      # Todoist API
-      - TODOIST_API_TOKEN
-
-      # Twilio WhatsApp
-      - TWILIO_ACCOUNT_SID
-      - TWILIO_AUTH_TOKEN
-      - TWILIO_WHATSAPP_NUMBER
-
-      # AI Models
-      - OPENAI_API_KEY
-      - OPENROUTER_API_KEY
-      - MODEL_PROVIDER
-      - MODEL_NAME
-
-      # Legacy NBN bot credentials (if needed)
-      - TELEGRAM_BOT_TOKEN
       - IPERIUM_EMAIL
       - IPERIUM_PASSWORD
       - GOOGLE_MAPS_API_KEY
-
-      # Optional: Conversation history (Redis)
-      - REDIS_URL
-
-    # Persist analytics and bot logs
     volumes:
       - analytics:/mnt/apps/yambabroadband/analytics
       - bot-logs:/var/log/yambabroadband
-
-
-    # Resource limits
     mem_limit: 256m
     memswap_limit: 256m
     cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    stdin_open: false
+    tty: false
 
-    # Logging - captures stdout/stderr, rotates automatically
+  whatsapp-nbn-baileys:
+    build:
+      context: ./baileys
+      dockerfile: Dockerfile
+    container_name: whatsapp-nbn-baileys
+    restart: unless-stopped
+    environment:
+      - PYTHON_LOOKUP_URL=http://whatsapp-nbn-lookup-bot:8000/lookup
+      - BAILEYS_AUTH_DIR=/app/auth
+    volumes:
+      - baileys-auth:/app/auth
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-    # Keep container responsive to signals
-    stdin_open: false
-    tty: false
-
 volumes:
   analytics:
     driver: local
   bot-logs:
+    driver: local
+  baileys-auth:
     driver: local
