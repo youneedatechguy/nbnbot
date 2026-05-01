@@ -23,11 +23,16 @@ async def test_handle_message_success():
     import bot.handlers as handlers
 
     result = NBNResult(
+        input_address="11 Wattle Drive Yamba NSW 2464",
         loc_id="LOC1",
+        match=None,
         address="11 Wattle Drive, Yamba NSW 2464",
         technology="FTTP",
+        serviceability=1,
+        ports_free=None,
+        ports_used=None,
+        ports_total=None,
         service_class="20",
-        status="Serviceable",
         fibre_on_demand=False,
     )
     mock_service = MagicMock()
