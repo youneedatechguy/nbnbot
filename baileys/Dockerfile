@@ -1,6 +1,6 @@
-# Dockerfile
-FROM node:14
+FROM node:20-alpine
 WORKDIR /app
-COPY . .
-RUN npm install
+COPY package.json .
+RUN npm install --omit=dev
+COPY index.js ./
 CMD ["node", "index.js"]
