@@ -57,8 +57,8 @@ async function start() {
         process.exit(0);
       }
 
-      console.log("WhatsApp connection closed; restarting container...");
-      process.exit(1);
+      console.log("WhatsApp connection closed; restarting container in 3s...");
+      setTimeout(() => process.exit(1), 3000);
     }
   });
 
