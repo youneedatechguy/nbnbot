@@ -38,8 +38,6 @@ services:
       - BAILEYS_AUTH_DIR=/app/auth
     volumes:
       - baileys-auth:/app/auth
-      - analytics:/mnt/apps/yambabroadband/analytics
-      - bot-logs:/var/log/yambabroadband
     logging:
       driver: "json-file"
       options:

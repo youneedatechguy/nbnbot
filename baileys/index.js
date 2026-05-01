@@ -14,7 +14,7 @@ const PYTHON_LOOKUP_URL =
 
 const AUTH_DIR = process.env.BAILEYS_AUTH_DIR || "./auth";
 
-async function extractTextFromMessage(message) {
+function extractTextFromMessage(message) {
   if (!message) return null;
   if (message.conversation) return message.conversation;
   if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
@@ -29,7 +29,6 @@ async function start() {
   const sock = makeWASocket({
     version,
     auth: state,
-    printQRInTerminal: true,
   });
 
   sock.ev.on("creds.update", saveCreds);
@@ -58,7 +57,7 @@ async function start() {
     if (msg.key?.fromMe) return;
     if (msg.message?.protocolMessage) return;
 
-    const text = await extractTextFromMessage(msg.message);
+    const text = extractTextFromMessage(msg.message);
     if (!text) return;
 
     try {
@@ -81,4 +80,8 @@ async function start() {
   });
 }
 
-start();
+if (require.main === module) {
+  start();
+}
+
+module.exports = { start };
