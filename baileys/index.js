@@ -33,18 +33,27 @@ async function start() {
 
   sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("connection.update", async (update) => {
+  sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect } = update;
 
     if (update.qr) {
+      console.log("=== SCAN THIS QR CODE IN WHATSAPP ===");
       qrcode.generate(update.qr, { small: true });
+      console.log("=== QR CODE END ===");
+    }
+
+    if (connection === "open") {
+      console.log("WhatsApp connection established and ready.");
     }
 
     if (connection === "close") {
       const shouldReconnect =
         lastDisconnect?.error?.output?.statusCode !==
         DisconnectReason.loggedOut;
-      if (shouldReconnect) start();
+      if (shouldReconnect) {
+        console.log("WhatsApp connection closed; restarting container...");
+        process.exit(0);
+      }
     }
   });
 
@@ -70,12 +79,28 @@ async function start() {
         typeof resp.data === "string" ? resp.data : resp.data?.message;
 
       if (!replyText) return;
-      await sock.sendMessage(jid, { text: replyText });
-    } catch {
-      await sock.sendMessage(
-        jid,
-        { text: "Sorry, an error occurred while looking up NBN availability." }
-      );
+      try {
+        await sock.sendMessage(jid, { text: replyText });
+      } catch (err) {
+        console.error("Failed to send reply to", jid, ":", err?.message);
+      }
+    } catch (err) {
+      console.error("Lookup failed for:", text, "-", err?.message);
+      try {
+        await sock.sendMessage(
+          jid,
+          {
+            text: "Sorry, an error occurred while looking up NBN availability.",
+          }
+        );
+      } catch (sendErr) {
+        console.error(
+          "Failed to send error reply to",
+          jid,
+          ":",
+          sendErr?.message
+        );
+      }
     }
   });
 }
