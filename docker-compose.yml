@@ -26,7 +26,14 @@ version: '3.8'
 # - REDIS_URL=redis://localhost:6379 (for conversation history)
 
 services:
-  whatsapp-todoist-bot:
+  whatsapp-nbn-baileys:
+    build:
+      context: ./baileys
+    environment:
+      - PYTHON_LOOKUP_URL
+    volumes:
+      - baileys-auth:/app/auth
+  whatsapp-nbn-lookup-bot:
     build:
       context: .
       dockerfile: Dockerfile
@@ -36,12 +43,8 @@ services:
       - "8001:8000"
     environment:
       # Todoist API
-      - TODOIST_API_TOKEN
-
-      # Twilio WhatsApp
-      - TWILIO_ACCOUNT_SID
-      - TWILIO_AUTH_TOKEN
-      - TWILIO_WHATSAPP_NUMBER
+      - IPERIUM_EMAIL
+      - IPERIUM_PASSWORD
 
       # AI Models
       - OPENAI_API_KEY
